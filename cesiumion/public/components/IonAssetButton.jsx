@@ -1,7 +1,4 @@
 import React, { PureComponent, Fragment } from "react";
-
-import { DropdownButton, MenuItem } from "react-bootstrap";
-
 import IonAssetLabel from "./IonAssetLabel";
 import { AssetStyles } from "../defaults";
 
@@ -23,38 +20,36 @@ export default class IonAssetButton extends PureComponent {
 			children,
 			assetComponent: AssetComponent
 		} = this.props;
-
+	
 		const menuItems = assets
-			.sort((a, b) =>
-				AssetStyles[a].name.localeCompare(AssetStyles[b].name)
-			)
+			.sort((a, b) => AssetStyles[a].name.localeCompare(AssetStyles[b].name))
 			.map(asset => (
-				<MenuItem
-					key={asset}
-					tag={"a"}
-					onClick={this.handleClick(asset)}
-				>
-					<AssetComponent asset={asset} showIcon={true} />
-				</MenuItem>
+				<li>
+					<a key={asset} style={{cursor:'pointer'}} onClick={this.handleClick(asset)}>
+						<AssetComponent asset={asset} showIcon={true} />
+					</a>
+				</li>
 			));
-
+	
 		const title = (
 			<Fragment>
 				<i className={"fa fa-cesium"} />
 				{children}
 			</Fragment>
 		);
-
+	
 		return (
-			<DropdownButton
-				id={"cesiumIonUploadDropdown"}
-				bsStyle={"primary"}
-				bsSize={"small"}
-				className={"ion-btn"}
-				title={title}
-			>
-				{menuItems}
-			</DropdownButton>
+			<div className={"btn-group"}>
+				<button type="button" className={"btn btn-sm btn-primary"} data-toggle="dropdown">
+					{title}
+				</button>
+				<button type="button" className={"btn btn-sm dropdown-toggle btn-primary"} data-toggle="dropdown">
+					<span className="caret"></span>
+				</button>
+				<ul className="dropdown-menu">
+					{menuItems}
+				</ul>
+			</div>
 		);
 	}
 }

@@ -1,50 +1,123 @@
-import { Formik, Field, getIn } from "formik";
-
-import {
-	FormGroup,
-	ControlLabel,
-	FormControl,
-	Checkbox,
-	HelpBlock
-} from "react-bootstrap";
+import React from 'react';
+import PropTypes from 'prop-types';
 
 const BootstrapFieldComponent = ({
-	field,
-	form: { touched, errors },
-	label,
-	help,
-	type = "",
-	showIcon = true,
-	...props
+    name,
+    value,
+    label,
+    help,
+    type = "text",
+    showIcon = true,
+    error,
+    touched,
+    onChange,
+    onBlur,
+    ...props
 }) => {
-	const isError = getIn(errors, field.name) && getIn(touched, field.name);
-	const errorMsg = getIn(errors, field.name);
-	let ControlComponent = FormControl;
+    const isError = error && touched;
+    const isCheckbox = type === "checkbox";
+    const ControlComponent = isCheckbox ? "input" : (type === "textarea" || type === "select") ? type : "input";
 
-	const testType = type.toLowerCase();
-	if (testType === "checkbox") ControlComponent = Checkbox;
-	else if (testType === "textarea" || testType === "select")
-		props.componentClass = testType;
-	else props.type = type;
-
-	return (
-		<FormGroup
-			controlId={field.name}
-			validationState={isError ? "error" : null}
-			style={{ marginLeft: 0, marginRight: 0 }}
-		>
-			{label && <ControlLabel>{label}</ControlLabel>}
-			<ControlComponent {...field} {...props} />
-			{isError && <HelpBlock>{errorMsg}</HelpBlock>}
-			{help && !isError && <HelpBlock>{help}</HelpBlock>}
-			{isError && showIcon && <FormControl.Feedback />}
-		</FormGroup>
-	);
+    return (
+        <div className={`form-group${isError ? ' has-error' : ''}`} style={{ marginLeft: 0, marginRight: 0 }}>
+            {label && !isCheckbox && <label htmlFor={name} className="control-label">{label}</label>}
+            <ControlComponent
+                id={name}
+                name={name}
+                className={isCheckbox ? "" : "form-control"}
+                type={type}
+                value={isCheckbox ? undefined : value}
+                checked={isCheckbox ? value : undefined}
+                onChange={onChange}
+                onBlur={onBlur}
+                {...props}
+            />
+            {label && isCheckbox && <label htmlFor={name} className="control-label">{label}</label>}
+            {isError && <span className="help-block">{error}</span>}
+            {help && !isError && <span className="help-block">{help}</span>}
+            {isError && showIcon && <span className="glyphicon glyphicon-remove form-control-feedback"></span>}
+        </div>
+    );
 };
 
-const BootstrapField = props => (
-	<Field component={BootstrapFieldComponent} {...props} />
-);
+BootstrapFieldComponent.propTypes = {
+    name: PropTypes.string.isRequired,
+    value: PropTypes.any,
+    label: PropTypes.string,
+    help: PropTypes.string,
+    type: PropTypes.string,
+    showIcon: PropTypes.bool,
+    error: PropTypes.string,
+    touched: PropTypes.bool,
+    onChange: PropTypes.func.isRequired,
+    onBlur: PropTypes.func.isRequired
+};
+
+class BootstrapField extends React.Component {
+    constructor(props) {
+        super(props);
+        this.state = {
+            value: props.type === "checkbox" ? props.checked : props.value || '',
+            touched: false,
+            error: ''
+        };
+    }
+
+    handleChange = (e) => {
+        const { type, checked, value } = e.target;
+        const newValue = type === "checkbox" ? checked : value;
+        this.setState({ value: newValue }, () => {
+            if (this.props.onChange) {
+                this.props.onChange(e);
+            }
+        });
+    };
+
+    handleBlur = (e) => {
+        this.setState({ touched: true }, () => {
+            if (this.props.onBlur) {
+                this.props.onBlur(e);
+            }
+        });
+    };
+
+    render() {
+        const { name, label, help, type, showIcon, validate, ...props } = this.props;
+        const { value, touched, error } = this.state;
+
+        let validationError = error;
+        if (validate) {
+            validationError = validate(value);
+        }
+
+        return (
+            <BootstrapFieldComponent
+                name={name}
+                value={value}
+                label={label}
+                help={help}
+                type={type}
+                showIcon={showIcon}
+                error={validationError}
+                touched={touched}
+                onChange={this.handleChange}
+                onBlur={this.handleBlur}
+                {...props}
+            />
+        );
+    }
+}
+
+BootstrapField.propTypes = {
+    name: PropTypes.string.isRequired,
+    label: PropTypes.string,
+    help: PropTypes.string,
+    type: PropTypes.string,
+    showIcon: PropTypes.bool,
+    validate: PropTypes.func,
+    onChange: PropTypes.func,
+    onBlur: PropTypes.func
+};
 
 export { BootstrapFieldComponent };
 export default BootstrapField;

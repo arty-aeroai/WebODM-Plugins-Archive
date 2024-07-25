@@ -15,11 +15,30 @@ def upload_to_ion(
     import time
     import logging
     import requests
-    from os import path
+    from os import path, remove
     from shutil import rmtree
     from enum import Enum
     from app.plugins import logger
-    from .api_views import (
+    
+    try:
+        # Import from coreplugins if using Docker
+        from coreplugins.cesiumion.api_views import (
+            get_asset_info,
+            set_asset_info,
+            AssetType,
+            ASSET_TO_OUTPUT,
+            ASSET_TO_SOURCE,
+            ASSET_TO_FILE,
+            pluck,
+            )
+        from coreplugins.cesiumion.model_tools import (
+            to_ion_texture_model, 
+            IonInvalidZip,
+            )
+        from coreplugins.cesiumion.globals import ION_API_URL
+    except ImportError:
+        # Import from plugins if imported as a plugin on exe application
+        from plugins.cesiumion.api_views import (
         get_asset_info,
         set_asset_info,
         AssetType,
@@ -28,11 +47,12 @@ def upload_to_ion(
         ASSET_TO_FILE,
         pluck,
         )
-    from .model_tools import (
-        to_ion_texture_model, 
-        IonInvalidZip,
-        )
-    from .globals import ION_API_URL
+        from plugins.cesiumion.model_tools import (
+            to_ion_texture_model, 
+            IonInvalidZip,
+            )
+        from plugins.cesiumion.globals import ION_API_URL
+    
     class LoggerAdapter(logging.LoggerAdapter):
         def __init__(self, prefix, logger):
             super().__init__(logger, {})
@@ -89,13 +109,19 @@ def upload_to_ion(
         # Update asset_path based off
         if asset_type == AssetType.TEXTURED_MODEL:
             try:
+                generated_zipfile = asset_path
                 asset_path, del_directory = to_ion_texture_model(asset_path)
                 logger.info("Created ion texture model!")
             except IonInvalidZip as e:
                 logger.info("Non geo-referenced texture model, using default file.")
             except Exception as e:
-                logger.warning("Failed to convert to ion texture model")
-                logger.warning(e)
+                logger.warning(f"Failed to convert to ion texture model: {e}")
+
+            if path.isfile(generated_zipfile):
+                remove(generated_zipfile)
+                logger.info(f"File {generated_zipfile} has been deleted.")
+            else:
+                logger.warning(f"The path {generated_zipfile} does not exist.")
 
         headers = {"Authorization": f"Bearer {token}"}
         data = {

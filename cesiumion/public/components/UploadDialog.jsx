@@ -1,12 +1,8 @@
 import React, { Component, Fragment } from "react";
 
-import FormDialog from "webodm/components/FormDialog";
-import { Formik } from "formik";
-import * as Yup from "yup";
-import { Row, Col, Modal, Button } from "react-bootstrap";
+import FormDialog from "../../../../app/static/app/js/components/FormDialog";
 
 import BootstrapField from "./BootstrapField";
-import FormikErrorFocus from "./FormikErrorFocus";
 import { ImplicitIonFetcher as IonFetcher } from "./Fetcher";
 import { AssetType, SourceType } from "../defaults";
 import "./UploadDialog.scss";
@@ -35,6 +31,45 @@ export default class UploadDialog extends Component {
 		}
 	};
 
+	constructor(props) {
+		super(props);
+
+		this.mergedInitialValues = {
+			...UploadDialog.defaultProps.initialValues,
+			...this.props.initialValues
+		};
+
+		this.state = {
+			title : props.title,
+			...this.mergedInitialValues
+		}
+	}
+
+    show(){
+        this.dialog.show();
+    }
+
+    handleChange = (e) => {
+        const { value, name } = e.target;
+		
+		if (name === "options.textureFormat")
+		{
+			let options = {...this.state.options};
+			options["textureFormat"] = value === "Yes";
+			this.setState({ options });
+		}
+		else if (name === "options.baseTerrainId")
+		{
+			let options = {...this.state.options};
+			options["baseTerrainId"] = value;
+			this.setState({ options });
+		}
+		else
+		{
+			this.setState({ [name]: value });
+		}
+    }
+
 	handleError = msg => error => {
 		this.props.onError(msg);
 		console.error(error);
@@ -42,7 +77,7 @@ export default class UploadDialog extends Component {
 
 	onSubmit = values => {
 		const { asset, onSubmit } = this.props;
-		values = JSON.parse(JSON.stringify(values));
+		values = JSON.parse(JSON.stringify(this.state));
 		const { options = {} } = values;
 
 		switch (UploadDialog.AssetSourceType[asset]) {
@@ -55,7 +90,7 @@ export default class UploadDialog extends Component {
 				options.waterMask = false;
 				break;
 			case SourceType.CAPTURE:
-				options.textureFormat = options.textureFormat ? "WEBP" : "AUTO";
+				options.textureFormat = options.textureFormat ? "KTX2" : "AUTO";
 				break;
 		}
 
@@ -65,10 +100,10 @@ export default class UploadDialog extends Component {
 	getSourceFields() {
 		switch (UploadDialog.AssetSourceType[this.props.asset]) {
 			case SourceType.RASTER_TERRAIN:
-				const loadOptions = ({ isLoading, isError, data }) => {
+				let loadOptions = ({ isLoading, isError, data }) => {
 					if (isLoading || isError)
 						return <option disabled>LOADING...</option>;
-					const userItems = data.items
+					let userItems = data.items
 						.filter(item => item.type === "TERRAIN")
 						.map(item => (
 							<option key={item.id} value={item.id}>
@@ -88,6 +123,8 @@ export default class UploadDialog extends Component {
 						name={"options.baseTerrainId"}
 						label={"Base Terrain: "}
 						type={"select"}
+						value={this.state.options.baseTerrainId}
+						onChange={this.handleChange}
 					>
 						<IonFetcher
 							path="assets"
@@ -104,17 +141,17 @@ export default class UploadDialog extends Component {
 				return (
 					<BootstrapField
 						name={"options.textureFormat"}
-						type={"checkbox"}
+						label={"Use KTX2 Compression"}
+						type={"select"}
+						value={this.state.options.textureFormat ? "Yes" : "No"}
 						help={
-							"Will produce WebP images, which are typically 25-34% smaller than " +
-							"equivalent JPEG images which leads to faster streaming and reduced " +
-							"data usage. 3D Tiles produced with this option require a client " +
-							"that supports the glTF EXT_texture_webp extension, such as " +
-							"CesiumJS 1.54 or newer, and a browser that supports WebP, such as " +
-							"Chrome or Firefox 65 and newer."
+							"KTX v2.0 is an image container format that supports Basis Universal supercompression. " +
+							"Use KTX2 compression to create a smaller tileset with better streaming performance."
 						}
+						onChange={this.handleChange}
 					>
-						Use WebP images
+						<option>No</option>
+						<option>Yes</option>
 					</BootstrapField>
 				);
 			default:
@@ -123,103 +160,63 @@ export default class UploadDialog extends Component {
 	}
 
 	getValidation() {
-		const schema = {};
+		let errors = {};
+        if (!values.name) {
+            errors.name = "A name is required!";
+        }
 
-		switch (UploadDialog.AssetSourceType[this.props.asset]) {
-			case SourceType.RASTER_TERRAIN:
-				schema.baseTerrainId = Yup.string();
-				break;
-			case SourceType.CAPTURE:
-				schema.textureFormat = Yup.boolean();
-				break;
-		}
+        switch (UploadDialog.AssetSourceType[this.props.asset]) {
+            case SourceType.RASTER_TERRAIN:
+                if (typeof values.options.baseTerrainId !== "string") {
+                    errors.baseTerrainId = "Invalid value!";
+                }
+                break;
+            case SourceType.CAPTURE:
+                if (typeof values.options.textureFormat !== "boolean") {
+                    errors.textureFormat = "Invalid value!";
+                }
+                break;
+        }
 
-		return Yup.object().shape({
-			name: Yup.string().required("A name is required!"),
-			options: Yup.object()
-				.shape(schema)
-				.default({})
-		});
+        return errors;
 	}
 
 	render() {
-		const {
-			initialValues,
-			onHide,
-			title,
-			loading: isLoading,
-			...options
-		} = this.props;
-
-		delete options["asset"];
-		delete options["onSubmit"];
-
-		const mergedInitialValues = {
-			...UploadDialog.defaultProps.initialValues,
-			...initialValues
-		};
-
 		return (
-			<Modal className={"ion-upload"} onHide={onHide} {...options}>
-				<Modal.Header closeButton>
-					<Modal.Title>
-						<i className={"fa fa-cesium"} /> {title}
-					</Modal.Title>
-				</Modal.Header>
-				<Formik
-					initialValues={mergedInitialValues}
-					onSubmit={this.onSubmit}
-					enableReinitialize
-					validationSchema={this.getValidation()}
-				>
-					{({ handleSubmit = () => {} }) => (
-						<form>
-							<Modal.Body>
-								<BootstrapField
-									name={"name"}
-									label={"Name: "}
-									type={"text"}
-								/>
-								<BootstrapField
-									name={"description"}
-									label={"Description: "}
-									type={"textarea"}
-									rows={"3"}
-								/>
-								<BootstrapField
-									name={"attribution"}
-									label={"Attribution: "}
-									type={"text"}
-								/>
-								{this.getSourceFields()}
-
-								<FormikErrorFocus />
-							</Modal.Body>
-
-							<Modal.Footer>
-								<Button onClick={onHide}>Close</Button>
-								{isLoading && (
-									<Button bsStyle="primary" disabled>
-										<i
-											className={"fa fa-sync fa-spin"}
-										/>
-										Submitting...
-									</Button>
-								)}
-								{!isLoading && (
-									<Button
-										bsStyle="primary"
-										onClick={handleSubmit}
-									>
-										<i className={"fa fa-upload"} />
-										Submit
-									</Button>
-								)}
-							</Modal.Footer>
-						</form>
-					)}
-				</Formik>
-			</Modal>
-		);
+            <FormDialog
+                title={this.state.title}
+                show={this.props.show}
+                onHide={this.props.onHide}
+                handleSaveFunction={this.onSubmit}
+                saveLabel={this.state.loading ? "Submitting..." : "Submit"}
+                savingLabel="Submitting..."
+                saveIcon={this.state.loading ? "fa fa-sync fa-spin" : "fa fa-upload"}
+                ref={(domNode) => { this.dialog = domNode; }}
+            >
+                <BootstrapField
+                    name={"name"}
+                    label={"Name: "}
+                    type={"text"}
+                    value={this.state.name}
+                    onChange={this.handleChange}
+                />
+                <BootstrapField
+                    name={"description"}
+                    label={"Description: "}
+                    type={"textarea"}
+                    rows={"3"}
+                    value={this.state.description}
+                    onChange={this.handleChange}
+                />
+                <BootstrapField
+                    name={"attribution"}
+                    label={"Attribution: "}
+                    type={"text"}
+                    value={this.state.attribution}
+                    onChange={this.handleChange}
+                />
+                {this.getSourceFields()}
+            </FormDialog>
+        );
 	}
 }

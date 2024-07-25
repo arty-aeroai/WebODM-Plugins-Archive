@@ -1,7 +1,6 @@
 import React, { Component, Fragment } from "react";
 
 import ErrorMessage from "webodm/components/ErrorMessage";
-import { Button } from "react-bootstrap";
 
 import IonAssetButton from "./components/IonAssetButton";
 import UploadDialog from "./components/UploadDialog";
@@ -15,6 +14,12 @@ import { AssetStyles } from "./defaults";
 import { fetchCancelable, getCookie } from "./utils";
 
 export default class TaskView extends Component {
+    constructor(){
+        super();
+        this.onOpenUploadDialog = this.onOpenUploadDialog.bind(this);
+		this.showTaskDialog = this.showTaskDialog.bind(this);
+    }
+    
 	state = {
 		error: "",
 		currentAsset: null,
@@ -26,16 +31,28 @@ export default class TaskView extends Component {
 	timeoutHandler = null;
 	refreshAssets = null;
 
-	onOpenUploadDialog = asset => this.setState({ currentAsset: asset });
+	onOpenUploadDialog(asset) {
+		this.setState({ currentAsset: asset });
+		if (this.uploadDialog != null) 
+		{
+			this.uploadDialog.show();
+		}
+	}
 
 	onHideUploadDialog = () =>
 		this.setState({ currentAsset: null, isUploadDialogLoading: false });
 
-	showTaskDialog = () => this.setState({ isTasksDialog: true });
+	showTaskDialog() {
+		this.setState({ isTasksDialog: true });
+		if (this.tasksDialog != null) 
+		{
+			this.tasksDialog.show();
+		}	
+	}
 
 	hideTaskDialog = () => this.setState({ isTasksDialog: false });
 
-	onUploadAsset = data => {
+	onUploadAsset = async data => {
 		const { task, token, apiURL } = this.props;
 		const { currentAsset } = this.state;
 		const payload = Object.assign({}, data);
@@ -49,7 +66,7 @@ export default class TaskView extends Component {
 		payload.asset_type = currentAsset;
 
 		this.setState({ isUploadDialogLoading: true });
-		this.cancelableFetch = fetchCancelable(
+		this.cancelableFetch = await fetchCancelable(
 			`/api${apiURL}/task/${task.id}/share`,
 			{
 				method: "POST",
@@ -197,34 +214,30 @@ export default class TaskView extends Component {
 										</IonAssetButton>
 									)}
 									{items.length <= 0 && (
-										<Button
-											className={"ion-btn"}
-											bsStyle={"primary"}
-											bsSize={"small"}
+										<button
+											className={"ion-btn btn btn-primary btn-sm"}
 											onClick={this.refreshAssets}
 										>
 											<i className={"fa fa-cesium"} />
 											Refresh Available ion Assets
-										</Button>
+										</button>
 									)}
 									{isTasks && (
-										<Button
-											className={"ion-btn"}
-											bsStyle={
-												isErrors ? "danger" : "primary"
-											}
-											bsSize={"small"}
+										<button
+											className={`ion-btn btn btn-sm ${isErrors ? "btn-danger" : "btn-primary"}`}
 											onClick={this.showTaskDialog}
 										>
 											<i className={"fa fa-cesium"} />
 											View ion Tasks
-										</Button>
+										</button>
 									)}
 									<TasksDialog
+										title={"Cesium ion Tasks"}
 										show={isTasksDialog}
 										tasks={processing}
 										onHide={this.hideTaskDialog}
 										onClearFailed={this.onClearFailedAssets}
+										ref={(domNode) => { this.tasksDialog = domNode; }}
 									/>
 								</Fragment>
 							);
@@ -236,8 +249,13 @@ export default class TaskView extends Component {
 					{({ isLoading, isError, data }) => {
 						const initialValues = {};
 
-						if (!isLoading && !isError && data.results.length > 0) {
-							const project = data.results[0];
+						if (isLoading || assetName === "")
+						{
+							return null;
+						}
+
+						if (!isLoading && !isError && data?.length > 0) {
+							const project = data[0];
 							initialValues.name = `${project.name} | ${task.name} ⁠— ${assetName}`;
 							initialValues.description = project.description;
 						}
@@ -252,6 +270,7 @@ export default class TaskView extends Component {
 								onHide={this.onHideUploadDialog}
 								onSubmit={this.onUploadAsset}
 								onError={this.onErrorUploadDialog}
+                                ref={(domNode) => { this.uploadDialog = domNode; }}
 							/>
 						);
 					}}
